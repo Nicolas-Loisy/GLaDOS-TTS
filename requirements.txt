@@ -1,0 +1,7 @@
+beautifulsoup4
+requests
+soundfile
+num2words
+librosa
+tqdm
+python-dotenv
