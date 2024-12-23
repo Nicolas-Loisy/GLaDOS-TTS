@@ -168,3 +168,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+
+# Project ignores
+audio/
+temp_audio/
+*.wav

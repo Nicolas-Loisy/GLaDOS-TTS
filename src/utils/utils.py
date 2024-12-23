@@ -2,19 +2,12 @@ import os
 import shutil
 import string
 import requests
-import soundfile as sf
 from multiprocessing.pool import ThreadPool
-from tqdm.notebook import tqdm
 from config import AUDIO_DIR, TEMP_DIR, DOWNLOAD_THREADS
 
 def remove_punctuation(text):
     """Remove punctuation from a string."""
     return text.translate(str.maketrans('', '', string.punctuation))
-
-def audio_duration(file_path):
-    """Calculate the duration of an audio file in seconds."""
-    with sf.SoundFile(file_path) as f:
-        return f.frames / f.samplerate
 
 def download_file(args):
     """Download a file from a URL and save it locally."""
@@ -53,9 +46,3 @@ def prepare_directories(overwrite=True):
 
     os.makedirs(AUDIO_DIR, exist_ok=True)
     return True
-
-def resample_audio(input_path, output_path, target_sampling_rate):
-    """Resample an audio file to the target sampling rate."""
-    import librosa
-    audio, _ = librosa.load(input_path, sr=target_sampling_rate)
-    sf.write(output_path, audio, samplerate=target_sampling_rate)

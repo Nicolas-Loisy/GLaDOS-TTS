@@ -1,8 +1,19 @@
 import os
 import shutil
-from tqdm.notebook import tqdm
-from utils.utils import resample_audio
+import soundfile as sf
+from tqdm import tqdm
 from config import TEMP_DIR, AUDIO_DIR, SAMPLING_RATE
+
+def audio_duration(file_path):
+    """Calculate the duration of an audio file in seconds."""
+    with sf.SoundFile(file_path) as f:
+        return f.frames / f.samplerate
+
+def resample_audio(input_path, output_path, target_sampling_rate):
+    """Resample an audio file to the target sampling rate."""
+    import librosa
+    audio, _ = librosa.load(input_path, sr=target_sampling_rate)
+    sf.write(output_path, audio, samplerate=target_sampling_rate)
 
 def resample_audio_files():
     print("Resampling audio files...")

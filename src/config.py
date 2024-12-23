@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 AUDIO_DIR = 'audio'
 TEMP_DIR = 'temp_audio'
+CACHE_FILE = 'cache/cache.json'
 DOWNLOAD_THREADS = 64
 SAMPLING_RATE = 22050
 BASE_DIR = "glados_out"
