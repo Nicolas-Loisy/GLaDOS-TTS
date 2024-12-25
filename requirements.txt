@@ -5,3 +5,20 @@ num2words
 librosa
 tqdm
 python-dotenv
+matplotlib
+
+
+# matplotlib
+# einops
+# wrapt
+# hydra
+
+# Installer torch manuellement pour gérer les versions avec ou sans CUDA
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+# Cython
+# youtokentome>=1.0.5
+# nemo-toolkit[all]
+
+# pip install fasttext-wheel
+# pip install Pyrebase4
+#

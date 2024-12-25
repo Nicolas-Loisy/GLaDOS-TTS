@@ -31,3 +31,20 @@ def create_manifest(urls, filenames, texts):
         json.dump(manifest_data, manifest, indent=4)
 
     print(f"Total audio duration: {total_audio_time / 60:.2f} minutes.")
+
+def read_manifest():
+    with open(f"{AUDIO_DIR}/manifest.json", 'r') as f:
+        manifest = json.load(f)
+    return manifest
+
+def split_manifest():
+    manifest = read_manifest()
+
+    validation_data = manifest[-5:]
+    train_data = manifest[:-5]
+
+    with open(f"{AUDIO_DIR}/manifest_validation.json", 'w') as f:
+        json.dump(validation_data, f, ensure_ascii=False, indent=4)
+
+    with open(f"{AUDIO_DIR}/manifest_train.json", 'w') as f:
+        json.dump(train_data, f, ensure_ascii=False, indent=4)
