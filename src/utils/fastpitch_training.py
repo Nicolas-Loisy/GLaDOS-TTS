@@ -196,24 +196,36 @@ def synthesize_audio(fastpitch, hifigan, denoiser, text, tp, pitch_mean, pitch_s
         fastpitch.eval()  # Mettre le modèle en mode évaluation
         print(f"Modèle chargé depuis : {model_path}")
     
+    # Préparer la séquence d'entrée
     batch = tp.prepare_input_sequence([text], batch_size=1)
 
-    # Vérifier le type de `batch` pour accéder correctement aux données
-    if isinstance(batch, list):
-        text_input = batch[0]  # Si `batch` est une liste
-    elif isinstance(batch, dict):
-        text_input = batch['text']  # Si `batch` est un dictionnaire
-    else:
-        raise TypeError(f"Type inattendu pour batch : {type(batch)}")
+    # Vérifier le contenu de batch
+    print(f"Contenu de batch : {batch}")
     
+    # Extraire les indices de texte depuis le batch
+    if isinstance(batch, list) and len(batch) > 0 and isinstance(batch[0], dict) and 'text' in batch[0]:
+        text_input = batch[0]['text']  # Tensor contenant les indices de texte
+    else:
+        raise KeyError(f"Impossible de trouver les indices nécessaires dans batch : {batch}")
+    
+    # Générer les paramètres pour le modèle FastPitch
     gen_kw = {'pace': 1.0, 'speaker': 0, 'pitch_tgt': pitch_mean, 'pitch_transform': pitch_std}
     
     with torch.no_grad():
-        mel, _, *_ = fastpitch(batch['text'], **gen_kw)
+        # Passer par le modèle FastPitch
+        mel, _, *_ = fastpitch(text_input, **gen_kw)
+        
+        # Générer l'audio avec HiFi-GAN
         audio = hifigan(mel).float()
+        
+        # Appliquer le denoiser
         audio = denoiser(audio.squeeze(1), denoising_strength=0.005)
+        
+        # Finaliser l'audio
         audio = audio.squeeze(1).detach().cpu().numpy()
+    
     return audio
+
 
 # 6. Fonction pour extraire les statistiques de pitch
 def extract_pitch_statistics(manifest_path):

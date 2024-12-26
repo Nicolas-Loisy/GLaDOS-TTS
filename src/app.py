@@ -72,7 +72,8 @@ def main():
         # Synthétiser l'audio
         audio = synthesize_audio(
             fastpitch, hifigan, denoiser, args.text, tp,
-            pitch_mean=0, pitch_std=1, model_path=args.model_path
+            # pitch_mean=0, pitch_std=1, model_path=args.model_path
+            pitch_mean=None, pitch_std=None, model_path=args.model_path
         )
 
         # Sauvegarder l'audio généré
