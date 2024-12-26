@@ -52,20 +52,51 @@ class FastPitchDataset(Dataset):
         text = entry["text"]
         
         # Préparer le texte avec le TextProcessor
-        text_tensor = self.tp.prepare_input_sequence([text], batch_size=1)[0]['text']
-        return audio, text_tensor
+        prepared = self.tp.prepare_input_sequence([text], batch_size=1)
+        text_tensor = prepared[0]['text']  # Assurez-vous que c'est correct
+        return audio, text_tensor.squeeze()
 
 # Fonction de collate pour gérer les tailles dynamiques
 def collate_fn(batch):
     """
     Fonction de collate pour ajouter du padding aux données audio et textes.
+    Cette fonction gère également les séquences vides et les types de données.
     """
+    
+    # Filtrer les éléments vides dans le batch (audios et textes)
+    batch = [item for item in batch if (item[0].ndim > 0 and item[1].ndim > 0) and len(item[0]) > 0 and len(item[1]) > 0]
+    
+    # Si après le filtrage, le batch est vide, lever une erreur
+    if len(batch) == 0:
+        raise ValueError("Le batch contient uniquement des séquences vides.")
+    
+    # Extraire les audios et les textes
     audios = [torch.tensor(item[0]) for item in batch]  # Convertir les audios en tensors
     texts = [item[1] for item in batch]  # Les textes sont déjà des tensors
     
     # Ajouter du padding pour les audios
     padded_audios = pad_sequence(audios, batch_first=True)
-    return padded_audios, texts
+    
+    # Ajouter du padding pour les textes, s'assurer que chaque texte est un tensor
+    texts = [torch.tensor(t).squeeze() if not isinstance(t, torch.Tensor) else t.squeeze() for t in texts]
+    padded_texts = pad_sequence(texts, batch_first=True)
+    
+    return padded_audios, padded_texts
+
+def pitch_transform(pitch_pred, mask, *args):
+    """
+    Fonction de transformation du pitch avec un masque.
+    """
+    # Vérification des dimensions
+    if pitch_pred.size(1) != mask.size(1):
+        raise ValueError(f"Les dimensions de pitch_pred ({pitch_pred.size(1)}) et mask ({mask.size(1)}) ne correspondent pas.")
+    
+    # Étendre le masque pour correspondre à la taille de pitch_pred
+    mask = mask.unsqueeze(-1)  # Ajouter une dimension pour correspondre à pitch_pred
+    
+    # Appliquer la transformation du pitch
+    return pitch_pred * mask
+
 
 # 4. Entraîner le modèle FastPitch
 def train_fastpitch(
@@ -82,38 +113,56 @@ def train_fastpitch(
     # Configurer l'optimiseur
     optimizer = Adam(fastpitch.parameters(), lr=lr)
     
-    # Entraîner le modèle
-    for epoch in range(int(num_epochs)):
+    for epoch in range(num_epochs):
         fastpitch.train()
         for batch in train_loader:
             audio, text = batch
+
+            # Si text est une liste, appliquez le padding
+            if isinstance(text, list):
+                text = [torch.tensor(t).squeeze() if not isinstance(t, torch.Tensor) else t.squeeze() for t in text]
+                text = pad_sequence(text, batch_first=True)
+
+            # Log des dimensions après le padding
+            print(f"Dimensions de text après padding : {text.size()}")
+
+            # Génération des paramètres pour FastPitch
             gen_kw = {
                 'pace': 1.0,
                 'speaker': 0,
-                'pitch_tgt': torch.full_like(text, pitch_mean),  # Moyenne du pitch comme cible
-                'pitch_transform': pitch_std  # Écart type du pitch pour la transformation
+                'pitch_tgt': None,
+                'pitch_transform': None
+                # 'pitch_tgt': torch.full(text.size(), pitch_mean, dtype=text.dtype, device=text.device),
+                # 'pitch_transform': pitch_transform
             }
-            outputs = fastpitch(text, **gen_kw)  # Passe le texte avec les hyperparamètres
-            
-            # Calcul de la perte (exemple, dépend du modèle exact)
-            loss = outputs.loss  # Peut varier selon votre implémentation
-            
-            # Backpropagation
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-        
+
+            # Passe dans le modèle FastPitch
+            outputs = fastpitch(text, **gen_kw)
+
+            # Calcul de la perte
+            # loss = outputs.loss  # Exemple, dépend de votre implémentation
+            # print(f"Perte : {loss.item()}")
+
+            # # Backpropagation
+            # optimizer.zero_grad()
+            # loss.backward()
+            # optimizer.step()
+
         # Validation
         fastpitch.eval()
         with torch.no_grad():
             val_loss = 0
             for batch in val_loader:
                 audio, text = batch
+                if isinstance(text, list):
+                    text = [torch.tensor(t).squeeze() if not isinstance(t, torch.Tensor) else t.squeeze() for t in text]
+                    text = pad_sequence(text, batch_first=True)
+
                 gen_kw = {
                     'pace': 1.0,
                     'speaker': 0,
-                    'pitch_tgt': torch.full_like(text, pitch_mean),
-                    'pitch_transform': pitch_std
+                    'pitch_tgt': torch.full(text.size(), pitch_mean, dtype=text.dtype, device=text.device),
+                    'pitch_transform': lambda x, y: x * pitch_std  # Même transformation
                 }
                 outputs = fastpitch(text, **gen_kw)
                 val_loss += outputs.loss.item()
@@ -207,46 +256,5 @@ def split_manifest(input_path="./audio/manifest.json", train_ratio=0.8):
     with open(val_manifest, "w") as f:
         json.dump(val_data, f, indent=4)
     
-    print(f"Manifeste divisé : {train_manifest} et {val_manifest}")
-
-# 9. Fonction pour télécharger et rééchantillonner les fichiers audio
-def resample_audio_files(input_dir="./audio", target_sr=22050):
-    """
-    Rééchantillonne tous les fichiers audio dans le répertoire donné à la fréquence cible.
-    """
-    for filename in os.listdir(input_dir):
-        if filename.endswith(".wav"):
-            input_path = os.path.join(input_dir, filename)
-            y, sr = librosa.load(input_path, sr=None)
-            if sr != target_sr:
-                y_resampled = librosa.resample(y, orig_sr=sr, target_sr=target_sr)
-                librosa.output.write_wav(input_path, y_resampled, sr=target_sr)
-                print(f"Rééchantillonné : {filename}")
-
-# 10. Fonction pour télécharger les fichiers audio
-def download_audio_files(from_cache=True, cache_path="./audio_cache.json"):
-    """
-    Télécharge ou charge les fichiers audio à partir du cache.
-    """
-    if from_cache and os.path.exists(cache_path):
-        with open(cache_path, "r") as f:
-            data = json.load(f)
-        urls, filenames, texts = data["urls"], data["filenames"], data["texts"]
-        print("Chargé depuis le cache.")
-        return urls, filenames, texts
-    
-    # Exemple de téléchargement (remplacer par votre propre logique)
-    urls = ["https://example.com/audio1.wav", "https://example.com/audio2.wav"]
-    filenames = ["audio1.wav", "audio2.wav"]
-    texts = ["This is the first audio.", "This is the second audio."]
-    
-    # Simuler le téléchargement
-    for url, filename in zip(urls, filenames):
-        # Télécharger ici
-        print(f"Téléchargement simulé : {url} -> {filename}")
-    
-    # Sauvegarder dans le cache
-    with open(cache_path, "w") as f:
-        json.dump({"urls": urls, "filenames": filenames, "texts": texts}, f)
-    
-    return urls, filenames, texts
+    print(f"Manifeste d'entraînement sauvegardé dans {train_manifest}")
+    print(f"Manifeste de validation sauvegardé dans {val_manifest}")
