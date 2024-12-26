@@ -174,3 +174,4 @@ cython_debug/
 audio/
 temp_audio/
 *.wav
+output/

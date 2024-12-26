@@ -101,7 +101,7 @@ def pitch_transform(pitch_pred, mask):
 # 4. Entraîner le modèle FastPitch
 def train_fastpitch(
     fastpitch, hifigan, denoiser, tp, train_manifest, val_manifest,
-    pitch_mean, pitch_std, num_epochs=10, lr=1e-4
+    pitch_mean, pitch_std, num_epochs=10, lr=1e-4, save_path="output/glados_fastpitch_model.pth"
 ):
     """Entraîne le modèle FastPitch."""
     # Préparer les données
@@ -170,10 +170,42 @@ def train_fastpitch(
                 # val_loss += outputs.loss.item()
             # print(f"Epoch {epoch + 1}/{num_epochs}, Validation Loss: {val_loss / len(val_loader)}")
 
+        # Sauvegarde du modèle après chaque époque
+        epoch_save_path = save_path.replace(".pth", f"_epoch{epoch + 1}.pth")
+        torch.save(fastpitch.state_dict(), epoch_save_path)
+        print(f"Modèle sauvegardé : {epoch_save_path}")
+
 # 5. Synthèse audio avec HiFi-GAN
-def synthesize_audio(fastpitch, hifigan, denoiser, text, tp, pitch_mean, pitch_std):
-    """Génère un fichier audio à partir d'un texte."""
+def synthesize_audio(fastpitch, hifigan, denoiser, text, tp, pitch_mean, pitch_std, model_path=None):
+    """
+    Génère un fichier audio à partir d'un texte.
+    
+    Args:
+        fastpitch: Modèle FastPitch.
+        hifigan: Modèle HiFi-GAN.
+        denoiser: Denoiser pour HiFi-GAN.
+        text: Texte à synthétiser.
+        tp: Préprocesseur de texte.
+        pitch_mean: Moyenne du pitch pour la normalisation.
+        pitch_std: Écart-type du pitch pour la normalisation.
+        model_path: Chemin vers le modèle FastPitch à charger (optionnel).
+    """
+    # Charger le modèle si un chemin est spécifié
+    if model_path:
+        fastpitch.load_state_dict(torch.load(model_path))
+        fastpitch.eval()  # Mettre le modèle en mode évaluation
+        print(f"Modèle chargé depuis : {model_path}")
+    
     batch = tp.prepare_input_sequence([text], batch_size=1)
+
+    # Vérifier le type de `batch` pour accéder correctement aux données
+    if isinstance(batch, list):
+        text_input = batch[0]  # Si `batch` est une liste
+    elif isinstance(batch, dict):
+        text_input = batch['text']  # Si `batch` est un dictionnaire
+    else:
+        raise TypeError(f"Type inattendu pour batch : {type(batch)}")
+    
     gen_kw = {'pace': 1.0, 'speaker': 0, 'pitch_tgt': pitch_mean, 'pitch_transform': pitch_std}
     
     with torch.no_grad():

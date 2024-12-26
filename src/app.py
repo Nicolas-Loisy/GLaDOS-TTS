@@ -8,6 +8,7 @@ from utils.fastpitch_training import (
     train_fastpitch,
     synthesize_audio
 )
+import librosa
 
 def main():
     # Étape 1 : Téléchargement des fichiers audio
@@ -47,7 +48,8 @@ def main():
         pitch_mean,
         pitch_std,
         num_epochs=10,
-        lr=1e-4
+        lr=1e-4,
+        save_path="output/glados_fastpitch_model.pth"
     )
 
     # Étape 7 : Synthèse audio pour tester le modèle
