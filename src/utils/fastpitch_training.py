@@ -83,7 +83,7 @@ def collate_fn(batch):
     
     return padded_audios, padded_texts
 
-def pitch_transform(pitch_pred, mask, *args):
+def pitch_transform(pitch_pred, mask):
     """
     Fonction de transformation du pitch avec un masque.
     """
@@ -161,12 +161,14 @@ def train_fastpitch(
                 gen_kw = {
                     'pace': 1.0,
                     'speaker': 0,
-                    'pitch_tgt': torch.full(text.size(), pitch_mean, dtype=text.dtype, device=text.device),
-                    'pitch_transform': lambda x, y: x * pitch_std  # Même transformation
+                    'pitch_tgt': None,
+                    'pitch_transform': None
+                    # 'pitch_tgt': torch.full(text.size(), pitch_mean, dtype=text.dtype, device=text.device),
+                    # 'pitch_transform': lambda x, y: x * pitch_std  # Même transformation
                 }
                 outputs = fastpitch(text, **gen_kw)
-                val_loss += outputs.loss.item()
-            print(f"Epoch {epoch + 1}/{num_epochs}, Validation Loss: {val_loss / len(val_loader)}")
+                # val_loss += outputs.loss.item()
+            # print(f"Epoch {epoch + 1}/{num_epochs}, Validation Loss: {val_loss / len(val_loader)}")
 
 # 5. Synthèse audio avec HiFi-GAN
 def synthesize_audio(fastpitch, hifigan, denoiser, text, tp, pitch_mean, pitch_std):
