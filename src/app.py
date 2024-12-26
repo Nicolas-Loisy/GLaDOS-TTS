@@ -29,8 +29,8 @@ def main():
         pitch_std,
         pitch_min,
         pitch_max,
-        num_epochs=10,
-        lr=1e-4
+        # num_epochs=10,
+        # lr=1e-4
     )
 if __name__ == "__main__":
     main()

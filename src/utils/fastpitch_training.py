@@ -9,9 +9,12 @@ from torch.utils.data import DataLoader, Dataset
 # 1. Charger le modèle FastPitch
 def load_fastpitch_model():
     """Charge le modèle FastPitch à partir de NVIDIA/DeepLearningExamples."""
-    model = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_fastpitch', trust_repo=True)
-    model.eval()  # Mode évaluation par défaut
-    return model
+    fastpitch, _ = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_fastpitch', trust_repo=True)
+    
+    # Passer le modèle en mode évaluation
+    fastpitch.eval()
+    
+    return fastpitch
 
 # 2. Extraire les statistiques de pitch
 def extract_pitch_statistics(manifest_path):
@@ -57,7 +60,7 @@ class FastPitchDataset(Dataset):
         return audio, text
 
 # 4. Entraîner le modèle FastPitch
-def train_fastpitch(model, train_manifest, val_manifest, pitch_mean, pitch_std, pitch_min, pitch_max, num_epochs=10, lr=1e-4):
+def train_fastpitch(model, train_manifest, val_manifest, pitch_mean, pitch_std, num_epochs=10, lr=1e-4):
     """Entraîne le modèle FastPitch."""
     # Préparer les données
     train_dataset = FastPitchDataset(train_manifest)
@@ -69,13 +72,19 @@ def train_fastpitch(model, train_manifest, val_manifest, pitch_mean, pitch_std, 
     optimizer = Adam(model.parameters(), lr=lr)
     
     # Entraîner le modèle
-    for epoch in range(num_epochs):
+    for epoch in range(int(num_epochs)):
         model.train()
         for batch in train_loader:
             audio, text = batch
             # Prétraitement et passage dans le modèle
-            # Assurez-vous d'adapter cela à l'architecture de FastPitch
-            outputs = model(audio, text, pitch_mean=pitch_mean, pitch_std=pitch_std)
+            # Vous pouvez ici ajuster pitch_tgt et pitch_transform
+            gen_kw = {
+                'pace': 1.0,
+                'speaker': 0,  # Vous pouvez ajuster le locuteur si vous avez plusieurs locuteurs
+                'pitch_tgt': pitch_mean,  # Utiliser la moyenne du pitch comme cible
+                'pitch_transform': pitch_std  # Utiliser l'écart type du pitch pour la transformation
+            }
+            outputs = model(text, **gen_kw)  # Passe le texte avec les hyperparamètres
             
             # Calcul de la perte (à définir selon le modèle)
             loss = outputs.loss  # Exemple, dépend du modèle exact
@@ -91,6 +100,13 @@ def train_fastpitch(model, train_manifest, val_manifest, pitch_mean, pitch_std, 
             val_loss = 0
             for batch in val_loader:
                 audio, text = batch
-                outputs = model(audio, text, pitch_mean=pitch_mean, pitch_std=pitch_std)
+                gen_kw = {
+                    'pace': 1.0,
+                    'speaker': 0,
+                    'pitch_tgt': pitch_mean,
+                    'pitch_transform': pitch_std
+                }
+                outputs = model(text, **gen_kw)
                 val_loss += outputs.loss.item()
             print(f"Epoch {epoch + 1}/{num_epochs}, Validation Loss: {val_loss / len(val_loader)}")
+
