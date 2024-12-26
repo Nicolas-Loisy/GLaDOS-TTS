@@ -217,9 +217,11 @@ def synthesize_audio(fastpitch, hifigan, denoiser, text, tp, pitch_mean, pitch_s
         
         # Générer l'audio avec HiFi-GAN
         audio = hifigan(mel).float()
+
+        denoising_strength=0.005
         
         # Appliquer le denoiser
-        audio = denoiser(audio.squeeze(1), denoising_strength=0.005)
+        audio = denoiser(audio.squeeze(1), denoising_strength)
         
         # Finaliser l'audio
         audio = audio.squeeze(1).detach().cpu().numpy()

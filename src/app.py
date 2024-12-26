@@ -9,7 +9,10 @@ from utils.fastpitch_training import (
     train_fastpitch,
     synthesize_audio
 )
-import librosa
+# import librosa
+import soundfile as sf
+import os
+
 
 def main():
     parser = argparse.ArgumentParser(description="GLaDOS-TTS Training and Generation")
@@ -76,9 +79,19 @@ def main():
             pitch_mean=None, pitch_std=None, model_path=args.model_path
         )
 
-        # Sauvegarder l'audio généré
+        # Chemin de sortie
         output_path = "output/generated_audio.wav"
-        librosa.output.write_wav(output_path, audio, sr=22050)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # Vérifier et normaliser les données audio
+        import numpy as np
+        if audio.dtype != np.float32:
+            audio = audio.astype(np.float32)
+        if np.max(np.abs(audio)) > 1.0:
+            audio = audio / np.max(np.abs(audio))
+
+        # Sauvegarder l'audio
+        sf.write(output_path, np.ravel(audio), 22050)
         print(f"Audio généré sauvegardé dans {output_path}")
 
 if __name__ == "__main__":
